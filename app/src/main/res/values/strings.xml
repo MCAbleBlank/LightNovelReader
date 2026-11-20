@@ -240,6 +240,8 @@
     <string name="settings_storage_manager_desc">Review how storage is used by the app, cache, plugins, and local files.</string>
     <string name="settings_select_data_source">Data Source</string>
     <string name="settings_select_data_source_desc">Switch the app\'s data source</string>
+    <string name="settings_data_source_section_desc_aggregate">Use all enabled data sources at once</string>
+    <string name="settings_data_source_section_desc_single">Use only the selected data source</string>
     <string name="settings_aggregation_mode">Aggregation mode</string>
     <string name="settings_aggregation_mode_desc">Search, explore and bookshelf use all enabled data sources</string>
     <string name="settings_sources_and_plugins">Sources and Plugins</string>

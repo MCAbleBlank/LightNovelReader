@@ -230,6 +230,8 @@
     <string name="settings_storage_manager_desc">查看软件缓存, 插件存储使用情况</string>
     <string name="settings_select_data_source">数据源</string>
     <string name="settings_select_data_source_desc">切换软件数据源</string>
+    <string name="settings_data_source_section_desc_aggregate">同时使用所有已启用的数据源</string>
+    <string name="settings_data_source_section_desc_single">仅使用选中的数据源</string>
     <string name="settings_aggregation_mode">聚合模式</string>
     <string name="settings_aggregation_mode_desc">搜索、探索与书架同时使用所有已启用的数据源</string>
     <string name="settings_sources_and_plugins">数据源与插件</string>
