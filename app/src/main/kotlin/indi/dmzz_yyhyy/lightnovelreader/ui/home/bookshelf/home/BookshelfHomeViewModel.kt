@@ -16,6 +16,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import indi.dmzz_yyhyy.lightnovelreader.data.book.BookRepository
 import indi.dmzz_yyhyy.lightnovelreader.data.bookshelf.BookshelfRepository
 import indi.dmzz_yyhyy.lightnovelreader.data.userdata.UserDataRepository
+import indi.dmzz_yyhyy.lightnovelreader.data.web.WebBookDataSourceManager
 import indi.dmzz_yyhyy.lightnovelreader.data.work.ImportDataWork
 import indi.dmzz_yyhyy.lightnovelreader.data.work.SaveBookshelfWork
 import indi.dmzz_yyhyy.lightnovelreader.ui.home.bookshelf.toBookshelfUiState
@@ -36,6 +37,7 @@ class BookshelfHomeViewModel @Inject constructor(
     private val bookshelfRepository: BookshelfRepository,
     private val bookRepository: BookRepository,
     userDataRepository: UserDataRepository,
+    private val webBookDataSourceManager: WebBookDataSourceManager,
     private val workManager: WorkManager,
 ) : ViewModel() {
     private val _uiState = MutableBookshelfHomeUiState(
@@ -67,14 +69,22 @@ class BookshelfHomeViewModel @Inject constructor(
         viewModelScope.launch {
             val bookshelfIdsFlow = bookshelfRepository.getAllBookshelvesFlow()
             val savedOrderFlow = bookshelfOrderUserData.getFlowWithDefault(emptyList())
-            combine(bookshelfIdsFlow, savedOrderFlow) { bookshelves, savedOrder ->
+            combine(
+                bookshelfIdsFlow,
+                savedOrderFlow,
+                webBookDataSourceManager.sourceConfigFlow
+            ) { bookshelves, savedOrder, _ ->
                 val stableIndexMap = savedOrder.withIndex().associate { it.value to it.index }
                 bookshelves.sortedBy {
                     stableIndexMap[it.id] ?: Int.MAX_VALUE
                 }
             }.map { list ->
                 list.map {
-                    it.toBookshelfUiState(bookRepository, bookshelfRepository)
+                    it.toBookshelfUiState(
+                        bookRepository,
+                        bookshelfRepository,
+                        webBookDataSourceManager::isBookIdEnabled
+                    )
                 }
             }.collect { bookshelfUiStates ->
                 if (_uiState.selectedBookshelf == null)

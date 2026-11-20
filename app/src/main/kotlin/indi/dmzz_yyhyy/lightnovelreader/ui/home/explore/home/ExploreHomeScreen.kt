@@ -60,7 +60,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -512,6 +514,7 @@ private fun ExploreSourceSelector(
     changeSource: (Identifier) -> Unit
 ) {
     if (uiState.sourceItems.size <= 1) return
+    val haptic = LocalHapticFeedback.current
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
@@ -521,7 +524,10 @@ private fun ExploreSourceSelector(
         items(uiState.sourceItems) { (sourceId, sourceName) ->
             FilterChip(
                 selected = uiState.selectedSourceId == sourceId,
-                onClick = { changeSource(sourceId) },
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                    changeSource(sourceId)
+                },
                 label = { Text(sourceName, maxLines = 1) }
             )
         }

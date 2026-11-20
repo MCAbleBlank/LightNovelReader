@@ -226,6 +226,10 @@ sealed class UserDataPath(
             data object EnabledWebDataSourceIds :
                 UserDataPath("enabled_web_data_source_ids", Data)
 
+            /** 是否启用多数据源聚合模式 @since Api 5 */
+            data object AggregationMode :
+                UserDataPath("aggregation_mode", Data)
+
             /** 日志级别设置 @since Api 2 */
             data object LogLevel : UserDataPath("log_level", Data)
 

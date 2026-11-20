@@ -11,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import indi.dmzz_yyhyy.lightnovelreader.data.plugin.PluginAppInfo
 import indi.dmzz_yyhyy.lightnovelreader.data.plugin.PluginManager
 import indi.dmzz_yyhyy.lightnovelreader.data.plugin.PluginMetadata
+import indi.dmzz_yyhyy.lightnovelreader.data.local.LocalDataManager
 import indi.dmzz_yyhyy.lightnovelreader.data.plugin.store.PluginUpdateCheckRepository
 import indi.dmzz_yyhyy.lightnovelreader.data.userdata.UserDataRepository
 import indi.dmzz_yyhyy.lightnovelreader.data.web.WebBookDataSourceManager
@@ -32,6 +33,7 @@ class PluginManagerViewModel @Inject constructor(
     val userDataRepository: UserDataRepository,
     val pluginUpdateCheckRepository: PluginUpdateCheckRepository,
     private val webBookDataSourceManager: WebBookDataSourceManager,
+    private val localDataManager: LocalDataManager,
 ) : ViewModel() {
 
     var dataSourceItems: List<WebDataSourceItem> by mutableStateOf(
@@ -42,14 +44,41 @@ class PluginManagerViewModel @Inject constructor(
         webBookDataSourceManager.enabledDataSourceIds
     )
         private set
+    var primaryDataSourceId: Identifier by mutableStateOf(
+        webBookDataSourceManager.primaryDataSourceId
+    )
+        private set
+    var aggregationMode: Boolean by mutableStateOf(
+        webBookDataSourceManager.aggregationMode
+    )
+        private set
+
     fun refreshDataSources() {
         dataSourceItems = webBookDataSourceManager.webDataSourceItems
         enabledDataSourceIds = webBookDataSourceManager.enabledDataSourceIds
+        primaryDataSourceId = webBookDataSourceManager.primaryDataSourceId
+        aggregationMode = webBookDataSourceManager.aggregationMode
     }
 
     fun setDataSourceEnabled(sourceId: Identifier, enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             webBookDataSourceManager.setWebDataSourceEnabled(sourceId, enabled)
+            refreshDataSources()
+        }
+    }
+
+    fun changeAggregationMode(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            webBookDataSourceManager.setAggregationMode(enabled)
+            refreshDataSources()
+        }
+    }
+
+    /** 单数据源模式下切换当前数据源: 先把它的历史数据合并进来, 再切换。 */
+    fun setPrimaryDataSource(sourceId: Identifier) {
+        viewModelScope.launch(Dispatchers.IO) {
+            localDataManager.importLocalDataFile(sourceId)
+            webBookDataSourceManager.setPrimaryWebDataSource(sourceId)
             refreshDataSources()
         }
     }

@@ -25,8 +25,9 @@ data class ResolvedBook(
 /**
  * 多数据源模式下按书籍解析它所属的数据源。
  *
- * 新数据的本地 id 形如 `数据源id|原始书id`; 旧数据没有前缀,
- * 通过书籍信息里记录的数据源归属兜底, 最终回退到当前主数据源。
+ * 新数据的本地 id 形如 `命名空间_数据源id:原始书id`；
+ * 旧数据兼容 `数据源id|原始书id` 和无前缀的原始 id。
+ * 没有前缀时通过书籍信息里记录的数据源归属兜底，最终回退到当前主数据源。
  */
 @Singleton
 class BookSourceResolver @Inject constructor(
@@ -36,12 +37,35 @@ class BookSourceResolver @Inject constructor(
     suspend fun resolve(bookId: String?): ProxyWebBookDataSource = resolveBook(bookId ?: "").source
 
     suspend fun resolveBook(bookId: String): ResolvedBook {
-        parseQualifiedBookId(bookId)?.let { parsed ->
+        matchSourceId(
+            bookId,
+            webBookDataSourceProvider.getAll().map { it.id }
+        )?.let { (sourceId, rawId) ->
+            webBookDataSourceProvider.get(sourceId)?.let { source ->
+                return ResolvedBook(
+                    localBookId = bookId,
+                    remoteBookId = rawId,
+                    sourceId = source.id,
+                    source = source
+                )
+            }
+        }
+        parseScopedId(bookId)?.let { parsed ->
+            sourceForPrefix(parsed.sourcePrefix)?.let { source ->
+                return ResolvedBook(
+                    localBookId = bookId,
+                    remoteBookId = parsed.rawId,
+                    sourceId = source.id,
+                    source = source
+                )
+            }
+        }
+        parseLegacyScopedId(bookId)?.let { parsed ->
             val source = webBookDataSourceProvider.get(parsed.sourceId.convertOldId())
             if (source != null) {
                 return ResolvedBook(
                     localBookId = bookId,
-                    remoteBookId = parsed.remoteBookId,
+                    remoteBookId = parsed.rawId,
                     sourceId = source.id,
                     source = source
                 )
@@ -61,4 +85,33 @@ class BookSourceResolver @Inject constructor(
             source = source
         )
     }
+
+    /** 根据本地 id 的前缀判断它是否属于已启用的数据源，供书架过滤使用。 */
+    fun isBookIdEnabled(bookId: String): Boolean {
+        matchSourceId(
+            bookId,
+            webBookDataSourceProvider.getAll().map { it.id }
+        )?.let { (sourceId, _) ->
+            return webBookDataSourceProvider.getEnabled().any { it.id == sourceId }
+        }
+        parseScopedId(bookId)?.let { parsed ->
+            val source = sourceForPrefix(parsed.sourcePrefix) ?: return false
+            return webBookDataSourceProvider.getEnabled().any { it.id == source.id }
+        }
+        parseLegacyScopedId(bookId)?.let { parsed ->
+            val source = webBookDataSourceProvider.get(parsed.sourceId.convertOldId())
+                ?: return false
+            return webBookDataSourceProvider.getEnabled().any { it.id == source.id }
+        }
+        // 没有前缀的旧书 id 归当前主数据源
+        return webBookDataSourceProvider.getEnabled().any {
+            it.id == webBookDataSourceProvider.value.id
+        }
+    }
+
+    private fun sourceForPrefix(prefix: String): ProxyWebBookDataSource? =
+        webBookDataSourceProvider.getAll().firstOrNull { source ->
+            sourceIdPrefix(source.id) == "$prefix:" ||
+                    "${source.id.namespace}_${source.id.id}:" == "$prefix:"
+        }
 }

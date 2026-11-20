@@ -7,7 +7,7 @@ import indi.dmzz_yyhyy.lightnovelreader.data.book.BookRepository
 import indi.dmzz_yyhyy.lightnovelreader.data.bookshelf.BookshelfRepository
 import indi.dmzz_yyhyy.lightnovelreader.data.explore.ExploreRepository
 import indi.dmzz_yyhyy.lightnovelreader.data.text.TextProcessingRepository
-import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyBookId
+import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyId
 import indi.dmzz_yyhyy.lightnovelreader.utils.convertOldId
 import io.nightfish.lightnovelreader.api.identifier.Identifier
 import io.nightfish.lightnovelreader.api.web.explore.ExploreExpandedPageDataSource
@@ -110,5 +110,5 @@ class ExpandedPageViewModel @Inject constructor(
     }
 
     private fun bookId(remoteBookId: String): String =
-        sourceId?.let { qualifyBookId(it.toString(), remoteBookId) } ?: remoteBookId
+        sourceId?.let { qualifyId(it, remoteBookId) } ?: remoteBookId
 }

@@ -17,6 +17,9 @@ import indi.dmzz_yyhyy.lightnovelreader.data.local.LocalBookDataSource
 import indi.dmzz_yyhyy.lightnovelreader.data.text.TextProcessingRepository
 import indi.dmzz_yyhyy.lightnovelreader.data.web.BookSourceResolver
 import indi.dmzz_yyhyy.lightnovelreader.data.web.WebBookDataSourceProvider
+import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyBookVolumes
+import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyChapterContent
+import indi.dmzz_yyhyy.lightnovelreader.data.web.stripSourcePrefix
 import indi.dmzz_yyhyy.lightnovelreader.data.web.proxy.ProxyWebBookDataSource
 import indi.dmzz_yyhyy.lightnovelreader.data.work.CacheBookWork
 import io.nightfish.lightnovelreader.api.book.BookInformation
@@ -98,13 +101,15 @@ class BookRepository @Inject constructor(
         }
         ref.source.getBookVolumes(ref.remoteBookId, priority)
             .onOk { remote ->
-                localBookDataSource.updateBookVolumes(remote.copy(bookId = id))
+                localBookDataSource.updateBookVolumes(
+                    qualifyBookVolumes(ref.sourceId, id, remote)
+                )
             }.onErr {
                 Log.e(TAG, "Failed to request web data (title=${it.title}, message=${it.message})")
                 it.throwable?.printStackTrace()
             }
             .also { result ->
-                emit(result.map { it.copy(bookId = id) })
+                emit(result.map { qualifyBookVolumes(ref.sourceId, id, it) })
             }
     }.map { result ->
         result.map {
@@ -122,15 +127,21 @@ class BookRepository @Inject constructor(
             emit(Ok(it))
             if (BuildConfig.BENCHMARK) return@flow
         }
-        ref.source.getChapterContent(chapterId, ref.remoteBookId, priority)
+        ref.source.getChapterContent(
+            stripSourcePrefix(ref.sourceId, chapterId),
+            ref.remoteBookId,
+            priority
+        )
             .onOk { remote ->
-                localBookDataSource.updateChapterContent(remote)
+                localBookDataSource.updateChapterContent(
+                    qualifyChapterContent(ref.sourceId, chapterId, remote)
+                )
             }.onErr {
                 Log.e(TAG, "Failed to request web data (title=${it.title}, message=${it.message})")
                 it.throwable?.printStackTrace()
             }
-            .also {
-                emit(it)
+            .also { result ->
+                emit(result.map { qualifyChapterContent(ref.sourceId, chapterId, it) })
             }
     }.map { result ->
         result.map {
@@ -144,9 +155,15 @@ class BookRepository @Inject constructor(
         priority: WebDataSourcePriority
     ) {
         val ref = bookSourceResolver.resolveBook(bookId)
-        ref.source.getChapterContent(chapterId, ref.remoteBookId, priority)
+        ref.source.getChapterContent(
+            stripSourcePrefix(ref.sourceId, chapterId),
+            ref.remoteBookId,
+            priority
+        )
             .onOk { remote ->
-                localBookDataSource.updateChapterContent(remote)
+                localBookDataSource.updateChapterContent(
+                    qualifyChapterContent(ref.sourceId, chapterId, remote)
+                )
             }.onErr {
                 Log.e(TAG, "Failed to request web data (title=${it.title}, message=${it.message})")
                 it.throwable?.printStackTrace()

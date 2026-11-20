@@ -11,6 +11,8 @@ import io.nightfish.lightnovelreader.api.web.WebBookDataSource
 import io.nightfish.lightnovelreader.api.web.WebBookDataSourceManagerApi
 import io.nightfish.lightnovelreader.api.web.WebDataSource
 import io.nightfish.lightnovelreader.api.web.WebDataSourceItem
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,9 +30,17 @@ class WebBookDataSourceManager @Inject constructor(
     private val webBookDataSources = mutableListOf<WebBookDataSource>()
     private val loadedWebDataSourceIds = mutableSetOf<Identifier>()
     private var _enabledDataSourceIds: Set<Identifier> = emptySet()
+    private var _aggregationMode: Boolean = false
+    private val _sourceConfigVersion = MutableStateFlow(0L)
 
-    /** 用户启用、允许参与搜索/探索的数据源 */
+    /** 数据源启用/主数据源变化时递增, 供界面重新过滤数据 */
+    val sourceConfigFlow = _sourceConfigVersion.asStateFlow()
+
+    /** 当前实际参与搜索/探索的数据源 */
     val enabledDataSourceIds: Set<Identifier> get() = _enabledDataSourceIds
+
+    /** 多数据源聚合模式; 关闭时只使用主数据源 */
+    val aggregationMode: Boolean get() = _aggregationMode
 
     override fun registerWebDataSource(
         webBookDataSource: WebBookDataSource,
@@ -115,42 +125,95 @@ class WebBookDataSourceManager @Inject constructor(
     }
 
     fun onWebDataSourceListChange() = runBlocking {
+        val registeredIds = webBookDataSources.map { it.id }.toSet()
         val configuredPrimaryId = userDataRepository
             .stringUserData(UserDataPath.Settings.Data.WebDataSourceId.path)
             .get()
-            ?.convertOldId() ?: "Wenku8".ofId()
+            ?.convertOldId()
+        var primaryId = configuredPrimaryId
+            ?.takeIf { registeredIds.contains(it) }
+            ?: registeredIds.firstOrNull()
+            ?: "Wenku8".ofId()
+
+        val aggregation = userDataRepository
+            .booleanUserData(UserDataPath.Settings.Data.AggregationMode.path)
+            .getOrDefault(false)
+        _aggregationMode = aggregation
 
         // 未设置过启用列表时默认启用全部数据源
         val storedEnabled = userDataRepository
             .stringListUserData(UserDataPath.Settings.Data.EnabledWebDataSourceIds.path)
             .get()
-        val enabledIds = storedEnabled
+        val userEnabledIds = storedEnabled
             ?.mapNotNull { runCatching { it.convertOldId() }.getOrNull() }
-            ?.filter { id -> webBookDataSources.any { it.id == id } }
+            ?.filter { registeredIds.contains(it) }
             ?.toSet()
-            ?: webBookDataSources.map { it.id }.toSet()
-        _enabledDataSourceIds = enabledIds
+            ?: registeredIds
 
-        // 主数据源必须处于启用状态
-        val primaryId = if (configuredPrimaryId in enabledIds || enabledIds.isEmpty()) {
-            configuredPrimaryId
+        val enabledIds = if (!aggregation) {
+            setOf(primaryId)
         } else {
-            enabledIds.first().also { fallback ->
+            if (userEnabledIds.isEmpty()) {
+                setOf(primaryId)
+            } else if (userEnabledIds.contains(primaryId)) {
+                userEnabledIds
+            } else {
+                primaryId = userEnabledIds.first()
                 userDataRepository
                     .stringUserData(UserDataPath.Settings.Data.WebDataSourceId.path)
-                    .set(fallback.toString())
+                    .set(primaryId.toString())
+                userEnabledIds
             }
         }
+        _enabledDataSourceIds = enabledIds
+        _sourceConfigVersion.value += 1
 
-        // 多活动数据源: 每个已注册的数据源都要初始化一次, 且只初始化一次
+        // 每个已注册的数据源都要初始化一次, 且只初始化一次
         webBookDataSources.forEach { dataSource ->
-            if (loadedWebDataSourceIds.add(dataSource.id)) dataSource.onLoad()
+            if (enabledIds.contains(dataSource.id) &&
+                loadedWebDataSourceIds.add(dataSource.id)
+            ) {
+                dataSource.onLoad()
+            }
         }
         mutableWebDataSourceProvider.updateAll(
             webBookDataSources.associateBy { it.id },
             primaryId,
             enabledIds
         )
+    }
+
+    /** 切换聚合模式; 关闭时只保留主数据源。 */
+    fun setAggregationMode(enabled: Boolean) {
+        runBlocking {
+            userDataRepository
+                .booleanUserData(UserDataPath.Settings.Data.AggregationMode.path)
+                .set(enabled)
+            onWebDataSourceListChange()
+        }
+    }
+
+    /** 书架等界面用: 判断某本书是否属于当前启用的数据源。 */
+    fun isBookIdEnabled(bookId: String): Boolean {
+        val enabledIds = _enabledDataSourceIds
+        matchSourceId(
+            bookId,
+            mutableWebDataSourceProvider.getAll().map { it.id }
+        )?.let { (sourceId, _) ->
+            return enabledIds.contains(sourceId)
+        }
+        parseScopedId(bookId)?.let { parsed ->
+            val source = mutableWebDataSourceProvider.getAll().firstOrNull { source ->
+                sourceIdPrefix(source.id) == "${parsed.sourcePrefix}:" ||
+                        "${source.id.namespace}_${source.id.id}:" == "${parsed.sourcePrefix}:"
+            }
+            if (source != null) return enabledIds.contains(source.id)
+        }
+        parseLegacyScopedId(bookId)?.let { parsed ->
+            return enabledIds.contains(parsed.sourceId.convertOldId())
+        }
+        // 无前缀的旧书 id 归当前主数据源
+        return enabledIds.contains(primaryDataSourceId)
     }
 
     /**
