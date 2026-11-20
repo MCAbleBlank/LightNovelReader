@@ -27,7 +27,8 @@ data class BookshelfUiState(
 
 fun Bookshelf.toBookshelfUiState(
     bookRepository: BookRepository,
-    bookshelfRepository: BookshelfRepository
+    bookshelfRepository: BookshelfRepository,
+    bookIdFilter: (String) -> Boolean = { true }
 ) = BookshelfUiState(
     id = this.id,
     name = this.name,
@@ -35,7 +36,7 @@ fun Bookshelf.toBookshelfUiState(
     sortReversed = this.sortReversed,
     autoCache = this.autoCache,
     systemUpdateReminder = this.systemUpdateReminder,
-    allBookFlows = this.allBookIds.map { id ->
+    allBookFlows = this.allBookIds.filter(bookIdFilter).map { id ->
         val bookInformationFlow = bookRepository.getBookInformationFlow(id)
         val bookshelfBookMetadataFlow = bookshelfRepository.getBookshelfBookMetadataFlow(id)
         id to bookInformationFlow.combine(bookshelfBookMetadataFlow) { result, bookshelfBookMetadata ->
@@ -48,7 +49,7 @@ fun Bookshelf.toBookshelfUiState(
             }
         }
     },
-    pinnedBookFlows = this.pinnedBookIds.map { id ->
+    pinnedBookFlows = this.pinnedBookIds.filter(bookIdFilter).map { id ->
         val bookInformationFlow = bookRepository.getBookInformationFlow(id)
         val bookshelfBookMetadataFlow = bookshelfRepository.getBookshelfBookMetadataFlow(id)
         id to bookInformationFlow.combine(bookshelfBookMetadataFlow) { result, bookshelfBookMetadata ->
@@ -61,7 +62,7 @@ fun Bookshelf.toBookshelfUiState(
             }
         }
     },
-    updatedBookFlows = this.updatedBookIds.map { id ->
+    updatedBookFlows = this.updatedBookIds.filter(bookIdFilter).map { id ->
         val bookInformationFlow = bookRepository.getBookInformationFlow(id)
         val bookVolumesFlow = bookRepository.getBookVolumesFlow(id)
         val bookshelfBookMetadataFlow = bookshelfRepository.getBookshelfBookMetadataFlow(id)

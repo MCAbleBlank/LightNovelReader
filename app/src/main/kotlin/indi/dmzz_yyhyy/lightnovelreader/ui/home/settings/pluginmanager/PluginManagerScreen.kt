@@ -21,6 +21,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
@@ -74,7 +75,11 @@ fun PluginManagerScreen(
     onClickShowSignatures: (String) -> Unit,
     dataSourceItems: List<WebDataSourceItem>,
     enabledDataSourceIds: Set<Identifier>,
-    onDataSourceEnabledChange: (Identifier, Boolean) -> Unit
+    aggregationMode: Boolean,
+    primaryDataSourceId: Identifier,
+    onAggregationModeChange: (Boolean) -> Unit,
+    onDataSourceEnabledChange: (Identifier, Boolean) -> Unit,
+    onPrimaryDataSourceChange: (Identifier) -> Unit
 ) {
     val enterAlwaysScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val claim = LocalClaimSnackbarHost.current
@@ -119,7 +124,11 @@ fun PluginManagerScreen(
             DataSourceSection(
                 items = dataSourceItems,
                 enabledIds = enabledDataSourceIds,
-                onEnabledChange = onDataSourceEnabledChange
+                aggregationMode = aggregationMode,
+                primaryId = primaryDataSourceId,
+                onAggregationModeChange = onAggregationModeChange,
+                onEnabledChange = onDataSourceEnabledChange,
+                onPrimaryChange = onPrimaryDataSourceChange
             )
             if (pluginInfoList.isEmpty()) {
                 Column(
@@ -280,7 +289,11 @@ private fun TopBar(
 private fun DataSourceSection(
     items: List<WebDataSourceItem>,
     enabledIds: Set<Identifier>,
-    onEnabledChange: (Identifier, Boolean) -> Unit
+    aggregationMode: Boolean,
+    primaryId: Identifier,
+    onAggregationModeChange: (Boolean) -> Unit,
+    onEnabledChange: (Identifier, Boolean) -> Unit,
+    onPrimaryChange: (Identifier) -> Unit
 ) {
     Column(Modifier.fillMaxWidth()) {
         SectionHeader(
@@ -289,6 +302,28 @@ private fun DataSourceSection(
                 .padding(top = 12.dp, bottom = 4.dp),
             text = stringResource(R.string.settings_select_data_source)
         )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_aggregation_mode),
+                    style = typography.titleMedium
+                )
+                Text(
+                    text = stringResource(R.string.settings_aggregation_mode_desc),
+                    style = typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = aggregationMode,
+                onCheckedChange = onAggregationModeChange
+            )
+        }
         items.forEach { item ->
             val enabled = enabledIds.contains(item.id)
             Row(
@@ -311,10 +346,17 @@ private fun DataSourceSection(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Switch(
-                    checked = enabled,
-                    onCheckedChange = { onEnabledChange(item.id, it) }
-                )
+                if (aggregationMode) {
+                    Switch(
+                        checked = enabled,
+                        onCheckedChange = { onEnabledChange(item.id, it) }
+                    )
+                } else {
+                    RadioButton(
+                        selected = item.id == primaryId,
+                        onClick = { onPrimaryChange(item.id) }
+                    )
+                }
             }
         }
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))

@@ -8,7 +8,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import indi.dmzz_yyhyy.lightnovelreader.data.explore.ExploreRepository
 import indi.dmzz_yyhyy.lightnovelreader.data.text.TextProcessingRepository
-import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyBookId
+import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyId
 import io.nightfish.lightnovelreader.api.identifier.Identifier
 import io.nightfish.lightnovelreader.api.web.explore.ExplorePageProvider
 import kotlinx.coroutines.Dispatchers
@@ -31,19 +31,33 @@ class ExploreHomeViewModel @Inject constructor(
         private set
 
     init {
+        refreshSources(initial = true)
+        viewModelScope.launch {
+            exploreRepository.sourceConfigFlow.collect { refreshSources(initial = false) }
+        }
+    }
+
+    private fun refreshSources(initial: Boolean) {
         val enabledIds = exploreRepository.getEnabledSources().map { it.id }.toSet()
         val items = exploreRepository.sourceItems
             .filter { enabledIds.isEmpty() || enabledIds.contains(it.id) }
             .map { it.id to it.name }
         _uiState.sourceItems = items
-        val initialSourceId = when {
-            items.isEmpty() -> null
-            items.any { it.first == exploreRepository.primarySourceId } ->
-                exploreRepository.primarySourceId
+        val current = _uiState.selectedSourceId
+        if (initial || current == null || items.none { it.first == current }) {
+            val initialSourceId = when {
+                items.isEmpty() -> null
+                items.any { it.first == exploreRepository.primarySourceId } ->
+                    exploreRepository.primarySourceId
 
-            else -> items.first().first
+                else -> items.first().first
+            }
+            if (initial) {
+                selectSource(initialSourceId, reset = false)
+            } else {
+                selectSource(initialSourceId, reset = true)
+            }
         }
-        selectSource(initialSourceId, reset = false)
     }
 
     fun selectSource(sourceId: Identifier?, reset: Boolean = true) {
@@ -116,7 +130,7 @@ class ExploreHomeViewModel @Inject constructor(
                                 bookList = exploreBooksRow.bookList.map {
                                     textProcessingRepository.processExploreBooksRow(it).let { book ->
                                         book.copy(
-                                            id = qualifyBookId(sourceId.toString(), book.id)
+                                            id = qualifyId(sourceId, book.id)
                                         )
                                     }
                                 }

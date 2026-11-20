@@ -19,6 +19,9 @@ import indi.dmzz_yyhyy.lightnovelreader.data.download.DownloadType
 import indi.dmzz_yyhyy.lightnovelreader.data.download.MutableDownloadItem
 import indi.dmzz_yyhyy.lightnovelreader.data.local.LocalBookDataSource
 import indi.dmzz_yyhyy.lightnovelreader.data.web.BookSourceResolver
+import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyBookVolumes
+import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyId
+import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyChapterContent
 
 @HiltWorker
 class CacheBookWork @AssistedInject constructor(
@@ -50,14 +53,22 @@ class CacheBookWork @AssistedInject constructor(
                 coroutineBinding {
                     var count = 0
                     val total = bookVolumes.volumes.sumOf { it.chapters.size } + 1
-                    localBookDataSource.updateBookVolumes(bookVolumes.copy(bookId = bookId))
+                    localBookDataSource.updateBookVolumes(
+                        qualifyBookVolumes(ref.sourceId, bookId, bookVolumes)
+                    )
                     bookVolumes.volumes.forEach { volume ->
-                        volume.chapters.map { it.id }.forEach { chapterId ->
+                        volume.chapters.map { it.id }.forEach { remoteChapterId ->
                             val chapter = ref.source.getChapterContent(
-                                chapterId = chapterId,
+                                chapterId = remoteChapterId,
                                 bookId = ref.remoteBookId
                             ).bind()
-                            localBookDataSource.updateChapterContent(chapter)
+                            localBookDataSource.updateChapterContent(
+                                qualifyChapterContent(
+                                    ref.sourceId,
+                                    qualifyId(ref.sourceId, remoteChapterId),
+                                    chapter
+                                )
+                            )
                             count++
                             downloadItem.progress = count.toFloat() / total
                         }

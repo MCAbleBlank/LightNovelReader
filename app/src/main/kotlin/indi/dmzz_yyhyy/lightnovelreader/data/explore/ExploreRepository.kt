@@ -3,7 +3,7 @@ package indi.dmzz_yyhyy.lightnovelreader.data.explore
 import indi.dmzz_yyhyy.lightnovelreader.data.web.WebBookDataSourceManager
 import indi.dmzz_yyhyy.lightnovelreader.data.web.WebBookDataSourceProvider
 import indi.dmzz_yyhyy.lightnovelreader.data.web.proxy.ProxyWebBookDataSource
-import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyBookId
+import indi.dmzz_yyhyy.lightnovelreader.data.web.qualifyId
 import io.nightfish.lightnovelreader.api.identifier.Identifier
 import io.nightfish.lightnovelreader.api.web.WebDataSourceItem
 import io.nightfish.lightnovelreader.api.web.explore.ExplorePageProvider
@@ -36,6 +36,8 @@ class ExploreRepository @Inject constructor(
     val sourceItems: List<WebDataSourceItem> get() = webBookDataSourceManager.webDataSourceItems
 
     val primarySourceId: Identifier get() = webBookDataSourceProvider.value.id
+
+    val sourceConfigFlow get() = webBookDataSourceManager.sourceConfigFlow
 
     fun getEnabledSources(): List<ProxyWebBookDataSource> =
         webBookDataSourceProvider.getEnabled()
@@ -71,7 +73,7 @@ class ExploreRepository @Inject constructor(
                                     hasResult = true
                                     send(
                                         SearchResult.MultipleBook(
-                                            qualifyBookId(source.id.toString(), result.bookId)
+                                            qualifyId(source.id, result.bookId)
                                         )
                                     )
                                 }
@@ -80,7 +82,7 @@ class ExploreRepository @Inject constructor(
                                     hasResult = true
                                     send(
                                         SearchResult.MultipleBook(
-                                            qualifyBookId(source.id.toString(), result.bookId)
+                                            qualifyId(source.id, result.bookId)
                                         )
                                     )
                                 }
@@ -122,10 +124,10 @@ class ExploreRepository @Inject constructor(
     private fun qualify(sourceId: Identifier, result: SearchResult): SearchResult =
         when (result) {
             is SearchResult.SingleBook ->
-                SearchResult.SingleBook(qualifyBookId(sourceId.toString(), result.bookId))
+                SearchResult.SingleBook(qualifyId(sourceId, result.bookId))
 
             is SearchResult.MultipleBook ->
-                SearchResult.MultipleBook(qualifyBookId(sourceId.toString(), result.bookId))
+                SearchResult.MultipleBook(qualifyId(sourceId, result.bookId))
 
             else -> result
         }

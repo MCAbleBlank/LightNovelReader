@@ -26,6 +26,7 @@ import indi.dmzz_yyhyy.lightnovelreader.data.download.DownloadProgressRepository
 import indi.dmzz_yyhyy.lightnovelreader.data.download.DownloadType
 import indi.dmzz_yyhyy.lightnovelreader.data.download.MutableDownloadItem
 import indi.dmzz_yyhyy.lightnovelreader.data.web.BookSourceResolver
+import indi.dmzz_yyhyy.lightnovelreader.data.web.stripSourcePrefix
 import indi.dmzz_yyhyy.lightnovelreader.ui.book.detail.ExportType
 import indi.dmzz_yyhyy.lightnovelreader.utils.DefaultBookCoverRenderer
 import indi.dmzz_yyhyy.lightnovelreader.utils.network.ImageDownloader
@@ -329,11 +330,20 @@ class ExportBookToEPUBWork @AssistedInject constructor(
                 publisher = bookInformation.publishingHouse
                 if (currentVolumeIndex == 0) cover(cover)
                 else {
+                    val remoteVolume = volume.copy(
+                        volumeId = stripSourcePrefix(bookRef.sourceId, volume.volumeId),
+                        chapters = volume.chapters.map {
+                            it.copy(id = stripSourcePrefix(bookRef.sourceId, it.id))
+                        }
+                    )
+                    val remoteContentMap = bookContentMap
+                        .mapKeys { stripSourcePrefix(bookRef.sourceId, it.key) }
+                        .toMutableMap()
                     val url = runCatching {
                         bookRef.source.getCoverUriInVolume(
                             bookRef.remoteBookId,
-                            volume,
-                            bookContentMap,
+                            remoteVolume,
+                            remoteContentMap,
                             applicationContext
                         )
                     }.getOrNull()

@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import indi.dmzz_yyhyy.lightnovelreader.data.book.BookRepository
+import indi.dmzz_yyhyy.lightnovelreader.data.web.WebBookDataSourceManager
 import indi.dmzz_yyhyy.lightnovelreader.data.userdata.UserDataRepository
 import io.nightfish.lightnovelreader.api.userdata.UserDataPath
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +19,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ReadingHomeViewModel @Inject constructor(
     private val bookRepository: BookRepository,
-    userDataRepository: UserDataRepository
+    userDataRepository: UserDataRepository,
+    private val webBookDataSourceManager: WebBookDataSourceManager
 ) : ViewModel() {
 
     private val readingBooksUserData =
@@ -34,10 +36,14 @@ class ReadingHomeViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            readingBooksUserData.getFlowWithDefault(emptyList()).collect { ids ->
+            combine(
+                readingBooksUserData.getFlowWithDefault(emptyList()),
+                webBookDataSourceManager.sourceConfigFlow
+            ) { ids, _ -> ids }.collect { ids ->
                 recentReadingBooks = ids
                     .reversed()
                     .filter(String::isNotBlank)
+                    .filter(webBookDataSourceManager::isBookIdEnabled)
                     .map { id ->
                         val bookInformationFlow = bookRepository.getBookInformationFlow(id)
                         val userReadingDataFlow = bookRepository.getUserReadingDataFlow(id)
